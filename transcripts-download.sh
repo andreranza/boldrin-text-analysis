@@ -2,9 +2,6 @@
 
 # looping through the links to get the video transcript from Michele Boldrin YT channel
 
-#readarray links < <(cut -f 2 -d , links.csv)
-
-
 links=($(cut -f 2 -d , links.csv | grep youtube))
 
 for link in ${links[@]}; do
