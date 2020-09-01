@@ -1,8 +1,10 @@
 library(tidyverse)
 library(lubridate)
 library(plotly)
+library(GGally)
 library(tokenizers)
 data <- read_csv("boldrin-videos.csv")
+theme_set(theme_bw())
 
 data %>% 
   filter(n_views > 25000) %>% 
@@ -36,7 +38,7 @@ data %>%
   filter(like_ratio > 10) %>% 
   ggplot(aes(x = reorder(vidTitle, like_ratio), y = like_ratio)) +
   geom_col() +
-  coord_flip() +
+  coord_flip(ylim = c(10, 16)) +
   theme_bw() +
   labs(title = "Videos with over 10% of likes on views from 'Michele Boldrin' YouTube channel",
        subtitle = str_c("Data retrieved on ", today()),
@@ -45,7 +47,7 @@ data %>%
        caption = "Source: YouTube Data API") +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5))
-ggsave("over10percent.png", path = "plots", width = 297, height = 210, units = "mm", dpi = 300, device = "png")
+#ggsave("over10percent.png", path = "plots", width = 297, height = 210, units = "mm", dpi = 300, device = "png")
 
 scatter <- ggplot(data, aes(y = like_ratio, x = dislike_ratio)) +
   geom_point(size = 0.15, shape = 20) +
@@ -99,7 +101,7 @@ glimpse(data)
 raw_words <- unlist(map(data$vidTitle, ~ tokenize_words(.x)))
 
 stop_it <- c(stopwords::stopwords("it"), "cosa", "po", "fra", "perche", "ii",
-             "iii", "de", "ovvero", "fa", "dopo", "due")
+             "iii", "de", "ovvero", "fa", "dopo", "due", "l'angolo")
 stop_en <- c(stopwords::stopwords("en"), "two", "vs")
 
 as_tibble(raw_words) %>% 
@@ -122,5 +124,58 @@ as_tibble(raw_words) %>%
        title = "Term frequency in video titles of 'Michele Boldrin' YouTube channel",
        subtitle = str_c("Data retrived on ", today()),
        caption = "Source: YouTube Data API")
+ggsave("term-frequency.png", path = "plots", width = 297, height = 210, units = "mm", dpi = 300, device = "png")
 
-  
+tibble(Count = as_factor(as.double(diff(data$vid_age)))) %>% 
+  ggplot(aes(x = Count)) +
+  geom_bar() +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  labs(x = "Delta Days",
+       y = "Count",
+       title = "Difference in days between consecutive videos on 'Michele Boldrin' YouTube Channel",
+       subtitle = str_c("Data retrived on ", today()),
+       caption = "Source: YouTube Data API")
+
+tibble(Count = as.double(diff(data$vid_age)), 
+       Delta_Views = diff(data$n_views)) %>% 
+  filter(Count < 8) %>% 
+  mutate(Count = as_factor(Count)) %>% 
+  ggplot(aes(x = Count, y = Delta_Views)) +
+  geom_boxplot(outlier.size = 0.5,
+               size = 0.5) +
+  theme_bw() +
+  scale_y_continuous(labels = scales::comma) +
+  coord_cartesian(ylim = c(-15000, 15000)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  labs(x = "Delta Days",
+       y = "Delta Views",
+       title = "Relationship between variation in views consecutive videos on 'Michele Boldrin' YouTube Channel",
+       subtitle = str_c("Data retrived on ", today()),
+       caption = "Source: YouTube Data API")
+glimpse(data)
+data %>% 
+  ggplot(aes(x = vid_min, y = n_views)) +
+  geom_point(size = 0.15, shape = 20) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5)) +
+  ggtitle("Michele Boldrin YT Channel") +
+  labs(y = "Number of Views", 
+       x = "Video Length (Min.)",
+       title = "Videos from 'Michele Boldrin' YouTube Channel",
+       subtitle = str_c("Data retrieved on ", today()),
+       caption = "Source: YouTube Data API") 
+
+data %>% 
+  select_if(is.numeric) %>% 
+  selec
+ggsave("scatter_views_length.png", path = "plots", width = 297, height = 210, units = "mm", dpi = 300, device = "png")
+
+data %>% 
+  select(n_views, n_likes, n_comments, n_dislikes, vid_min) %>% 
+  ggpairs(lower = list(continuous = wrap("points", size = 0.25))) 
+
+

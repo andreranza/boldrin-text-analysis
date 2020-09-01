@@ -1,0 +1,39 @@
+---
+title: "*Michele Boldrin* YouTube Channel: a general survey."
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Motivation
+
+The following analysis was carried out to yield some insights on my preferred YouTube channel: *Michele Boldrin*. In addition, this small-scale project gave me the opportunity to experiment with the YouTube API and JSON data structure. 
+
+## Description
+
+The first step consisted in querying the API to obtain the following features for each single video of the channel:
+
+* video title
+* video ID
+* number of views
+* number of likes
+* number of dislikes
+* number of comments
+* upload date and time
+
+Besides the number of comments, all the other data 
+
+In particular, using these data I will try to answer the following question: does a video, on average, gain or lose views than the previous one as days between them increase? 
+
+Moreover, it will be interesting to verify if videos where Professor Boldrin appears by himself obtain, on average, more views with respect to the others in which, on the other hand, he has a debate with other hosts. Finally, it seems worth to group videos in categories and see which one 
+
+
+
+do the views of a video raise, on average, when days between consecutive videos increase? And if so, what is the optimal number of days that should be time interval between successive videos, i.e. the number of days that maximazes the number of views? 
+The first step to interact with the YouTube API consists in requesting an API Key on the Google Developer Console using a Google Account. More details concerning how to get started with your project using this API can be found at \url{https://developers.google.com/youtube/v3/getting-started}.
+
+One crucial step in working with any API relies in identifying how to build the request in order to obtain the data we actually need. In practice, this reduces to assemble the appropriate URL referring to a specific \emph{resource}, each of which sends back different types of data. For our purposes, we will call the following resources: \emph{channels}, \emph{playlistItems} and \emph{videos}. The complete list of resources of the YouTube API can be found at \url{https://developers.google.com/youtube/v3/getting-started#resources}. 
+
+

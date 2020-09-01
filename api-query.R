@@ -104,7 +104,6 @@ resource3 <- "/videos"
 pars3 <- "snippet%2CcontentDetails%2Cstatistics"
 
 res_vid <- vector(mode = "list", length = nrow(df))
-
 for (i in seq_along(df$videoId)) {
   res_vid[[i]] <- GET(str_c(uri,
                             resource3, 
@@ -119,6 +118,9 @@ for (i in seq_along(df$videoId)) {
 
 videos <- map(res_vid, ~ content(.x, "text"))
 
+# JSON example
+prettify(videos[[100]])
+
 # Views
 n_views <- map_chr(videos, ~ fromJSON(.x)$items$statistics$viewCount)
 
@@ -128,19 +130,44 @@ n_likes <- map_chr(videos, ~ fromJSON(.x)$items$statistics$likeCount)
 # Dislikes
 n_dislikes <- map_chr(videos, ~ fromJSON(.x)$items$statistics$dislikeCount)
 
-glimpse(df)
+# Comments: deactivated comments are returned as NULL 
+n_comments <- map(videos, ~ fromJSON(.x)$items$statistics$commentCount) %>% 
+  modify_if(is.null, ~ NA)
+n_comments <- unlist(n_comments)
+
+# Description
+description <- map_chr(videos, ~ fromJSON(.x)$items$snippet$description) %>% 
+  map_chr(~ na_if(.x,""))
+
+# Video length
+vid_duration <- map(videos, ~ fromJSON(.x)$items$contentDetails$duration) %>% 
+  map_chr(~ str_remove_all(.x, pattern = "PT|\\d{1,2}S$")) %>% 
+  map_chr(~ str_replace_all(.x, pattern = "(?<=H)(?=\\d)", replacement = " ")) %>% 
+  map_dbl(~ duration(.x)/60)
+
+# Tags
+tags <- map_(videos, ~fromJSON(.x)$items$snippet$tags)
 
 # Dataset
 data <- df %>% 
   mutate(n_views = as.double(n_views),
          n_likes = as.double(n_likes),
+         n_comments = as.double(n_comments),
          n_dislikes = as.double(n_dislikes),
+         vid_min = as.double(vid_duration),
          like_ratio = round((n_likes/n_views)*100, 2),
          dislike_ratio = round((n_dislikes/n_views)*100, 2),
          release_date = date(videoPublishedAt),
-         vid_age = today() - release_date) %>% 
-  select(-videoPublishedAt)
-print(data, n = Inf)
+         vid_age = today() - release_date,
+         description = description,
+         link = str_c("https://www.youtube.com/watch?v=", videoId)) %>% 
+  select(-videoPublishedAt) %>% 
+  arrange(desc(release_date))
+print(data, n = 153)
 glimpse(data)
-#write_csv(data, "boldrin-videos.csv")
 
+write_csv(data, "boldrin-videos.csv")
+
+data %>% 
+  select(videoId, link) %>% 
+  write_csv("transcripts/links.csv")
