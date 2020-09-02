@@ -2,8 +2,6 @@ library(tidyverse)
 library(lubridate)
 library(httr)
 library(jsonlite)
-library(ggExtra)
-library(plotly)
 
 uri <- "https://www.googleapis.com/youtube/v3"
 resource <- "/channels"
