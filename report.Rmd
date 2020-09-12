@@ -6,14 +6,25 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+```{r, echo=FALSE, message=FALSE}
+library(tidyverse)
+library(tokenizers)
+library(textrecipes)
+library(tidytext)
+library(stopwords)
+library(httr)
+library(jsonlite)
+```
 
 ## Motivation
 
-The following analysis was carried out to yield some insights on my preferred YouTube channel: *Michele Boldrin*. In addition, this small-scale project gave me the opportunity to experiment with the YouTube API and JSON data structure. 
+The following analysis was carried out to yield some insights on my preferred YouTube channel: [*Michele Boldrin*](https://www.youtube.com/channel/UCMOiTfbUXxUFqJJtCQGHrrA). In addition, this small-scale project gave me the opportunity to experiment with the YouTube API, JSON data structure, regular expressions and text mining concepts. 
 
 ## Description
 
-The first step consisted in querying the API to obtain the following features for each single video of the channel:
+The following analysis used both quantitative data retrieved from the YouTube API and text data consisting in the auto-generated video transcripts of the over six-hundred videos existing in the channel. Text data were downloaded by means of the command-line program [*youtube-dl*](http://ytdl-org.github.io/youtube-dl/). Unfortunately, a text transcript was not available for the entire set of videos, hence ...
+
+By querying the API, I obtain the following - mostly quantitative - features for each video of the channel:
 
 * video title
 * video ID
@@ -22,18 +33,256 @@ The first step consisted in querying the API to obtain the following features fo
 * number of dislikes
 * number of comments
 * upload date and time
+* duration
+* video description
 
-Besides the number of comments, all the other data 
+Below, it is shown a slice of the data set for illustration purposes:
 
-In particular, using these data I will try to answer the following question: does a video, on average, gain or lose views than the previous one as days between them increase? 
+```{r, echo=FALSE, message=FALSE}
+data <- read_csv("data/boldrin-videos.csv") %>% 
+  select(-c(link, vid_age, vidTitle, description, like_ratio, dislike_ratio)) %>% 
+  head()
+knitr::kable(data, 
+             caption = "Data set resulting from the API query")
+```
 
-Moreover, it will be interesting to verify if videos where Professor Boldrin appears by himself obtain, on average, more views with respect to the others in which, on the other hand, he has a debate with other hosts. Finally, it seems worth to group videos in categories and see which one 
+Alongside API data, the video transcripts once downloaded appeared as follows: 
 
+```{r, echo=FALSE}
+txt_files <- dir("./transcripts")
 
+# Filter only the txt files
+txt_files <- keep(txt_files, ~ str_detect(.x, ".txt$"))
 
-do the views of a video raise, on average, when days between consecutive videos increase? And if so, what is the optimal number of days that should be time interval between successive videos, i.e. the number of days that maximazes the number of views? 
-The first step to interact with the YouTube API consists in requesting an API Key on the Google Developer Console using a Google Account. More details concerning how to get started with your project using this API can be found at \url{https://developers.google.com/youtube/v3/getting-started}.
+# Check: should be TRUE
+sum(map_lgl(txt_files, ~ str_detect(.x, ".txt$"))) == length(txt_files)
 
-One crucial step in working with any API relies in identifying how to build the request in order to obtain the data we actually need. In practice, this reduces to assemble the appropriate URL referring to a specific \emph{resource}, each of which sends back different types of data. For our purposes, we will call the following resources: \emph{channels}, \emph{playlistItems} and \emph{videos}. The complete list of resources of the YouTube API can be found at \url{https://developers.google.com/youtube/v3/getting-started#resources}. 
+setwd("./transcripts")
+transcripts <- map(txt_files, ~ read_file(.x))
+setwd("../")
+print(str_split(transcripts[[1]], "\n", n = 20))
+```
 
+this data set , transcript for each video using the command-line program [*youtube-dl*](http://ytdl-org.github.io/youtube-dl/) in order to put into practice some of the techniques presented in the book [*Text Mining with R*](https://www.tidytextmining.com) by Julia Silge and David Robinson. 
+
+<!-- ### Querying the YouTube API -->
+
+<!-- In particular, using these data I will try to answer the following question: does a video, on average, gain or lose views compared to the previous one as the number of days between them increases? -->
+
+<!-- First of all, in order to have access to the data from the YouTube API, I obtained an API Key on the *Google Developer Console* using my Google Account.  -->
+<!-- More details concerning how to get started with your project using this API can be found at https://developers.google.com/youtube/v3/getting-started. -->
+
+<!-- Next, I built the request to be send to the API in order to obtain the data I needed pointing to specific [*resources*](https://developers.google.com/youtube/v3/getting-started#resources). Each resource sends back different types of data. For our purposes, we will call the following resources: *channels*, *playlistItems* and *videos*. -->
+
+<!-- The packages **httr** ans **jsonlite** allows to send requests. See this enlightening [RStudio webinar](https://www.youtube.com/watch?v=MAZic778uOw) for an introduction on the functionalities of these packages. -->
+
+<!-- The packages needed to interact with the API are the following: -->
+
+<!-- ```{r, message=FALSE} -->
+<!-- library(tidyverse) -->
+<!-- library(lubridate) -->
+<!-- library(httr) -->
+<!-- library(jsonlite) -->
+<!-- ``` -->
+
+<!-- ### API resource: *Channels*  -->
+
+<!-- The resource *channels* provides general information about the channel, such as: number of subscribers, total views of the channel and total number of videos. -->
+
+<!-- ```{r, message=FALSE, echo=FALSE, cache=TRUE} -->
+<!-- uri <- "https://www.googleapis.com/youtube/v3" -->
+<!-- resource <- "/channels" -->
+<!-- pars <- "contentDetails%2Cstatistics" -->
+<!-- name <- "MicheleBoldrin" -->
+
+<!-- # res_ch is of class "response" -->
+<!-- res_ch <- GET(str_c(uri,  -->
+<!--                     resource, -->
+<!--                     "?part=",  -->
+<!--                     pars,  -->
+<!--                     "&forUsername=",  -->
+<!--                     name,  -->
+<!--                     "&key=",  -->
+<!--                     Sys.getenv("YT_API")) -->
+<!-- ) -->
+
+<!-- # Retrieve the contents of the request -->
+<!-- ch_parsed <- content(res_ch, "text") -->
+
+<!-- # Convert the JSON into a nested list -->
+<!-- json_ch <- fromJSON(ch_parsed) -->
+
+<!-- # Channel Id -->
+<!-- ch_id <- json_ch$items$id -->
+
+<!-- # Upload Id -->
+<!-- up_id <- json_ch$items$contentDetails$relatedPlaylists$uploads -->
+
+<!-- # Total number of videos -->
+<!-- tot_vids <- json_ch$items$statistics$videoCount -->
+
+<!-- # Total number of subscribers -->
+<!-- tot_subs <- json_ch$items$statistics$subscriberCount -->
+
+<!-- # Total channel views -->
+<!-- tot_view <- json_ch$items$statistics$viewCount -->
+
+<!-- info <- tibble( -->
+<!--   Info = c("Channel Name", "Numb. of Videos", "Numb. of Views",  -->
+<!--            "Numb. of Subscribers", "Upload Playlist Id"), -->
+<!--   Data = c("Michele Boldrin", tot_vids,  -->
+<!--            tot_view, tot_subs, ch_id) -->
+<!-- )  -->
+<!-- knitr::kable(info, digits = 3, format.args = list(big.mark = ",", scientific = FALSE)) -->
+<!-- ``` -->
+
+<!-- ## API resource: *PlaylistItems* -->
+
+<!-- The *playistItems* returns the video title jointly with the videoId and date of upload. The former one will be then leveraged in order to get the remaining data from the *Videos* resource. -->
+<!-- Since *playistItems* limits the maximum number of items in the result set to 50 for each call, I obtain the entire collection making recursive calls to the API until details for the total number of videos `r tot_vids` is achieved. -->
+
+<!-- ```{r, message=FALSE, cache=TRUE} -->
+<!-- uri <- "https://www.googleapis.com/youtube/v3" -->
+<!-- up_id <- json_ch$items$contentDetails$relatedPlaylists$uploads -->
+<!-- resource2 <- "/playlistItems" -->
+<!-- pars2 <- "contentDetails%2C%20snippet%2C%20id&maxResults=50" -->
+<!-- tot_vids <- json_ch$items$statistics$videoCount -->
+
+<!-- res_items <- GET(str_c(uri, -->
+<!--                        resource2, -->
+<!--                        "?part=",  -->
+<!--                        pars2,  -->
+<!--                        "&playlistId=",  -->
+<!--                        up_id,  -->
+<!--                        "&key=",  -->
+<!--                        Sys.getenv("YT_API")) -->
+<!-- ) -->
+
+<!-- # Parse the content from JSON data -->
+<!-- items_parsed <- content(res_items, "text") -->
+<!-- playlists_items <- fromJSON(items_parsed) -->
+
+<!-- # First next page token  -->
+<!-- next_token <- playlists_items$nextPageToken -->
+
+<!-- # Initialize data set: title, video Id, upload time -->
+<!-- details <- as_tibble(playlists_items$items$contentDetails) -->
+<!-- titles <- as_tibble(playlists_items$items$snippet$title) -->
+<!-- df <- bind_cols(titles, details) -->
+
+<!-- # Grow df by means of recursive calls to the API resource -->
+<!-- while(TRUE) { -->
+
+<!--   if (nrow(df) < tot_vids) { -->
+<!--     # Call the API -->
+<!--     r_items <- GET(str_c(uri, -->
+<!--                          resource2, -->
+<!--                          "?part=",  -->
+<!--                          pars2,  -->
+<!--                          "&pageToken=",  -->
+<!--                          tail(next_token, n = 1),  -->
+<!--                          "&playlistId=",  -->
+<!--                          up_id,  -->
+<!--                          "&key=",  -->
+<!--                          Sys.getenv("YT_API")) -->
+<!--     ) -->
+<!--     # Parsing -->
+<!--     p_items <- content(r_items, "text") -->
+<!--     play_items <- fromJSON(p_items) -->
+
+<!--     # Concatenate next 50 videos -->
+<!--     det <- as_tibble(play_items$items$contentDetails) -->
+<!--     tit <- as_tibble(play_items$items$snippet$title) -->
+<!--     df <- bind_rows(df, bind_cols(tit, det)) -->
+
+<!--     # Update next page token to get info on next 50 videos -->
+<!--     next_token <- c(next_token, play_items$nextPageToken) -->
+<!--     #print(next_token) -->
+<!--   } else { -->
+<!--     break -->
+<!--   } -->
+<!-- } -->
+
+<!-- df <- df %>%  -->
+<!--   distinct(videoId, .keep_all = TRUE) %>%  -->
+<!--   rename(vidTitle = value) -->
+
+<!-- ``` -->
+
+<!-- ## API resource: *Videos* -->
+
+<!-- I get the remaining data looping over the column videoId of the data frame grown in the previous chunk.  -->
+
+<!-- ```{r, message=FALSE} -->
+<!-- library(tidyverse) -->
+<!-- resource3 <- "/videos" -->
+<!-- pars3 <- "snippet%2CcontentDetails%2Cstatistics" -->
+
+<!-- res_vid <- vector(mode = "list", length = nrow(df)) -->
+<!-- for (i in seq_along(df$videoId)) { -->
+<!--   res_vid[[i]] <- GET(str_c(uri, -->
+<!--                             resource3,  -->
+<!--                             "?part=",  -->
+<!--                             pars3,  -->
+<!--                             "&id=",  -->
+<!--                             df$videoId[i],  -->
+<!--                             "&key=",  -->
+<!--                             Sys.getenv("YT_API")) -->
+<!--   ) -->
+<!-- } -->
+
+<!-- videos <- map(res_vid, ~ content(.x, "text")) -->
+
+<!-- # JSON example -->
+<!-- prettify(videos[[100]]) -->
+
+<!-- # Views -->
+<!-- n_views <- map_chr(videos, ~ fromJSON(.x)$items$statistics$viewCount) -->
+
+<!-- # Likes -->
+<!-- n_likes <- map_chr(videos, ~ fromJSON(.x)$items$statistics$likeCount) -->
+
+<!-- # Dislikes -->
+<!-- n_dislikes <- map_chr(videos, ~ fromJSON(.x)$items$statistics$dislikeCount) -->
+
+<!-- # Comments: deactivated comments are returned as NULL  -->
+<!-- n_comments <- map(videos, ~ fromJSON(.x)$items$statistics$commentCount) %>%  -->
+<!--   modify_if(is.null, ~ NA) -->
+<!-- n_comments <- unlist(n_comments) -->
+
+<!-- # Description -->
+<!-- description <- map_chr(videos, ~ fromJSON(.x)$items$snippet$description) %>%  -->
+<!--   map_chr(~ na_if(.x,"")) -->
+
+<!-- # Video length -->
+<!-- vid_duration <- map(videos, ~ fromJSON(.x)$items$contentDetails$duration) %>%  -->
+<!--   map_chr(~ str_remove_all(.x, pattern = "PT|\\d{1,2}S$")) %>%  -->
+<!--   map_chr(~ str_replace_all(.x, pattern = "(?<=H)(?=\\d)", replacement = " ")) %>%  -->
+<!--   map_dbl(~ duration(.x)/60) -->
+
+<!-- # Tags -->
+<!-- tags <- map_(videos, ~fromJSON(.x)$items$snippet$tags) -->
+
+<!-- # Dataset -->
+<!-- data <- df %>%  -->
+<!--   mutate(n_views = as.double(n_views), -->
+<!--          n_likes = as.double(n_likes), -->
+<!--          n_comments = as.double(n_comments), -->
+<!--          n_dislikes = as.double(n_dislikes), -->
+<!--          vid_min = as.double(vid_duration), -->
+<!--          like_ratio = round((n_likes/n_views)*100, 2), -->
+<!--          dislike_ratio = round((n_dislikes/n_views)*100, 2), -->
+<!--          release_date = date(videoPublishedAt), -->
+<!--          vid_age = today() - release_date, -->
+<!--          description = description, -->
+<!--          link = str_c("https://www.youtube.com/watch?v=", videoId)) %>%  -->
+<!--   select(-videoPublishedAt) %>%  -->
+<!--   arrange(desc(release_date)) -->
+
+<!-- # write_csv(data, "boldrin-videos.csv") -->
+
+<!-- # data %>%  -->
+<!-- #   select(videoId, link) %>%  -->
+<!-- #   write_csv("transcripts/links.csv") -->
+<!-- ``` -->
 

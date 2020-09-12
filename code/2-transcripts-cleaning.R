@@ -1,7 +1,8 @@
 library(tidyverse)
 
 # files <- list.files("transcripts", pattern = ".vtt", full.names = TRUE)
-# new_files <- map_chr(files, ~ str_replace_all(.x, pattern = ".vtt$", replacement = ".txt"))
+# new_files <- map_chr(files, ~ str_replace_all(.x, pattern = "vtt$",
+#                                               replacement = "txt"))
 # file.rename(files, new_files)
 
 txt_files <- dir("./transcripts")
@@ -25,7 +26,7 @@ p5 <- "\\s\\\n\\n\\n[:alpha:]+\\n"
 p6 <- "0\\d\\:.+\\d{3}"
 p7 <- "(\\<\\>\\<c\\>)|(\\<\\/c\\>)|(l\\')|(un\\')|(d\\')"
 
-# better to make a long regex and iterate once or smaller and iterate more than once?
+# Make a long regex and iterate once or smaller and iterate more than once?
 transcripts_cleaned <- map(transcripts, ~ str_remove_all(.x, pattern = p0)) %>% 
   map(~ str_remove_all(.x, pattern = p1)) %>% 
   map(~ str_remove_all(.x, pattern = p2)) %>% 
@@ -47,3 +48,9 @@ for(i in seq_along(transcripts_cleaned)) {
              path = str_c("./transcripts-cleaned/", txt_files[i]))
 }
 
+id_transcripts <- map(txt_files, ~ str_remove_all(.x, pattern = ".it.txt")) %>%
+  map(~ str_extract_all(.x, pattern = ".{11}$")) %>% 
+  flatten() %>% 
+  unlist()
+
+write_lines(id_transcripts, path = "./data/id-transcripts.txt", sep = "\n")

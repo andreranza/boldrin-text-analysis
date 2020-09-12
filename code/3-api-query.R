@@ -20,12 +20,25 @@ res_ch <- GET(str_c(uri,
 
 http_status(res_ch)$message
 
+# Retrieve the contents of the request as a character vector in JSON format
 ch_parsed <- content(res_ch, "text")
+
+# Convert the JSON into a nested list
 json_ch <- fromJSON(ch_parsed)
+
+# Channel Id
 ch_id <- json_ch$items$id
+
+# Upload Id
 up_id <- json_ch$items$contentDetails$relatedPlaylists$uploads
+
+# Total number of videos
 tot_vids <- json_ch$items$statistics$videoCount
+
+# Total number of subscribers
 tot_subs <- json_ch$items$statistics$subscriberCount
+
+# Total channel views
 tot_view <- json_ch$items$statistics$viewCount
 
 info <- tibble(
@@ -48,6 +61,7 @@ res_items <- GET(str_c(uri,
 )
 
 http_status(res_items)
+prettify(res_items)
 
 # Parse the content from JSON data
 items_parsed <- content(res_items, "text")
@@ -62,6 +76,7 @@ titles <- as_tibble(playlists_items$items$snippet$title)
 
 df <- bind_cols(titles, details)
 
+# Grow df by recursive calls to the API resource
 while(TRUE) {
   
   if (nrow(df) < tot_vids) {
@@ -144,7 +159,11 @@ vid_duration <- map(videos, ~ fromJSON(.x)$items$contentDetails$duration) %>%
   map_dbl(~ duration(.x)/60)
 
 # Tags
-tags <- map_(videos, ~fromJSON(.x)$items$snippet$tags)
+tags <- map(videos, ~fromJSON(.x)$items$snippet$tags) %>% 
+  modify_if(is.null, as.character) %>% 
+  modify_depth(1, unlist) %>% 
+  modify_if(~ length(.x) == 0, ~ NA) %>% 
+  map_chr(~ str_c(.x, collapse = ", "))
 
 # Dataset
 data <- df %>% 
@@ -158,14 +177,28 @@ data <- df %>%
          release_date = date(videoPublishedAt),
          vid_age = today() - release_date,
          description = description,
-         link = str_c("https://www.youtube.com/watch?v=", videoId)) %>% 
+         link = str_c("https://www.youtube.com/watch?v=", videoId),
+         tags = tags) %>% 
   select(-videoPublishedAt) %>% 
   arrange(desc(release_date))
-print(data, n = 153)
+View(data)
+print(data, n = 10)
 glimpse(data)
 
 write_csv(data, "boldrin-videos.csv")
 
+# links.csv useful if we run the bash script to loop over the link columns
+# in order to download the scripts.
+
 data %>% 
   select(videoId, link) %>% 
-  write_csv("transcripts/links.csv")
+  write_csv("data/links.csv")
+
+# links.txt is useful since youtube-dl has an option -a that allows to specify
+# the path of a file containing the links.
+# This prevent the user from using the bash script and looping over the links.
+data %>% 
+  select(link) %>% 
+  pull() %>% 
+  write_lines("data/links.txt", sep = "\n")
+ 

@@ -93,7 +93,7 @@ data %>%
        title = "Number of videos released monthly on 'Michele Boldrin' YouTube channel",
        subtitle = str_c("Data retrieved on ", today()),
        caption = "Source: YouTube Data API")
-#ggsave("monthly-videos.png", path = "plots", width = 297, height = 210, units = "mm", dpi = 300, device = "png")
+ggsave("monthly-videos.png", path = "plots", width = 297, height = 210, units = "mm", dpi = 300, device = "png")
 
 glimpse(data)
 
