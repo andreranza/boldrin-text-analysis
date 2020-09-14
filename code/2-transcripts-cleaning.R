@@ -5,7 +5,7 @@ library(tidyverse)
 #                                               replacement = "txt"))
 # file.rename(files, new_files)
 
-txt_files <- dir("./transcripts")
+txt_files <- dir("./transcripts", full.names = TRUE)
 
 # Filter only the txt files
 txt_files <- keep(txt_files, ~ str_detect(.x, ".txt$"))
@@ -13,9 +13,8 @@ txt_files <- keep(txt_files, ~ str_detect(.x, ".txt$"))
 # Check: should be TRUE
 sum(map_lgl(txt_files, ~ str_detect(.x, ".txt$"))) == length(txt_files)
 
-setwd("./transcripts")
+# Load the transcripts 
 transcripts <- map(txt_files, ~ read_file(.x))
-setwd("../")
 
 p0 <- "0\\d\\:.+\\%"
 p1 <- "[:alpha:]+\\<0\\d\\:.+c\\>"

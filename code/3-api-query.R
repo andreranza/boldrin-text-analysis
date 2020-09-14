@@ -185,14 +185,14 @@ View(data)
 print(data, n = 10)
 glimpse(data)
 
-write_csv(data, "boldrin-videos.csv")
+write_csv(data, "./data/boldrin-videos.csv")
 
 # links.csv useful if we run the bash script to loop over the link columns
 # in order to download the scripts.
 
 data %>% 
   select(videoId, link) %>% 
-  write_csv("data/links.csv")
+  write_csv("./data/links.csv")
 
 # links.txt is useful since youtube-dl has an option -a that allows to specify
 # the path of a file containing the links.
@@ -200,5 +200,5 @@ data %>%
 data %>% 
   select(link) %>% 
   pull() %>% 
-  write_lines("data/links.txt", sep = "\n")
+  write_lines("./data/links.txt", sep = "\n")
  

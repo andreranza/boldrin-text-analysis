@@ -538,6 +538,7 @@ male
 malgrado
 malissimo
 mancano
+maniera
 me
 medesimo
 mediante
@@ -1033,3 +1034,4 @@ vuol
 vuole
 x
 xt
+tanti

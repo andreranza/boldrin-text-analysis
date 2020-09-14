@@ -5,9 +5,9 @@ library(tidytext)
 library(topicmodels)
 library(stopwords)
 
-txt_files <- dir("./transcripts-cleaned", full.names = TRUE)
-t_cleaned <- map(txt_files, ~ read_file(.x)) %>% 
-  set_names(nm = dir("./transcripts-cleaned"))
+txt_files <- dir("transcripts-cleaned", full.names = TRUE)
+t_cleaned <- map(txt_files, ~ read_file(.x))
+names(t_cleaned) <- dir("transcripts-cleaned")
 
 #### TIDY DATA ####
 
@@ -21,13 +21,12 @@ stop_words_it <- read_file("data/stopwords-it-topic-mod.txt") %>%
   arrange() %>%
   distinct()
 
-write_lines(stop_words_it, 
-            path = "./data/stopwords-it-topic-mod.txt", 
-            sep = "\n")
+class(t_cleaned)
+str(t_cleaned)
 
 # Tidy form one word per row
-tidy_df <- map(t_cleaned, ~ tokenize_words(.x, stopwords = stop_words_it)) %>% 
-  flatten() %>% 
+tidy_df <- map(t_cleaned, ~ tokenize_words(.x)) %>% 
+  purrr::flatten() %>% 
   enframe() %>% 
   unnest(cols = value) %>% 
   mutate(name = str_remove_all(name, "(\\-.{11}.it.txt)")) %>% 
@@ -42,6 +41,8 @@ document_number <- tidy_df %>%
 
 # Data set for topic modeling
 tidy_df <- left_join(tidy_df, document_number, by = "video_id") 
+
+#write_csv(tidy_df, path = "data/df-topic-modeling.csv")
 
 # Word frequency in each video
 word_frequency <- tidy_df %>% 
@@ -82,7 +83,7 @@ transcripts_words <- left_join(word_frequency, total_words) %>%
 
 dtm_df <- cast_dtm(tidy_df, term = text, document = video_id, value = document)
 
-boldrin_lda <- LDA(dtm_df, k = 4, control = list(seed = 1234))
+boldrin_lda <- LDA(dtm_df, k = 9, control = list(seed = 1234))
 
 boldrin_topics <- tidy(boldrin_lda, matrix = "beta")
 
@@ -103,6 +104,8 @@ boldrin_top_terms %>%
   theme(panel.grid.major.y = element_blank(),
         plot.title = element_text(hjust = 0.5)) +
   labs(title = "The terms which are most common within each topic")
+# ggsave("topics.png", path = "plots", width = 297, height = 210, 
+#        units = "mm", dpi = 300, device = "png")
 
 beta_spread <- boldrin_topics %>% 
   mutate(topic = str_c("topic", topic)) %>% 

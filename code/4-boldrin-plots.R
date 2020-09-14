@@ -19,7 +19,8 @@ data %>%
        caption = "Source: YouTube Data API") +
   theme(plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5))
-ggsave("over25k.png", width = 297, height = 210, units = "mm", dpi = 300, device = "png")
+ggsave("over25k.png", width = 297, height = 210, units = "mm", dpi = 300, 
+       device = "png")
 
 ggplot(data, aes(y = like_ratio, x = dislike_ratio)) +
   geom_point(size = 0.75, shape = 20) +
