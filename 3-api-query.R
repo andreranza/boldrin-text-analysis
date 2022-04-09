@@ -3,111 +3,126 @@ library(lubridate)
 library(httr)
 library(jsonlite)
 
-uri <- "https://www.googleapis.com/youtube/v3"
-resource <- "/channels"
-pars <- "contentDetails%2Cstatistics"
-name <- "MicheleBoldrin"
+url <- "https://www.googleapis.com/"
+user_name <- "MicheleBoldrin"
 
-res_ch <- GET(str_c(uri, 
-                    resource,
-                    "?part=", 
-                    pars, 
-                    "&forUsername=", 
-                    name, 
-                    "&key=", 
-                    Sys.getenv("YT_API"))
+# Fetch channel data and playlistItems ID ---------------------------------
+
+response <- GET(
+  url,
+  path = "youtube/v3/channels",
+  query = list(
+    forUsername = user_name, 
+    part = "statistics", 
+    part = "contentDetails", 
+    key = Sys.getenv("YT_API")
+    )
 )
-
-http_status(res_ch)$message
+status <- httr::http_status(response)
+if (!str_detect(status[["message"]], "200")) {
+  stop("Bad request")
+}
 
 # Retrieve the contents of the request as a character vector in JSON format
-ch_parsed <- content(res_ch, "text")
+parsed_resp <- content(response, "text")
 
 # Convert the JSON into a nested list
-json_ch <- fromJSON(ch_parsed)
+json_resp <- jsonlite::fromJSON(parsed_resp)
 
-# Channel Id
-ch_id <- json_ch$items$id
+channel_df <- json_resp %>% 
+  discard(is_empty) %>% 
+  unlist() %>% 
+  as_tibble(rownames = "names") %>% 
+  pivot_wider(names_from = names, values_from = value) %>% 
+  janitor::clean_names() %>% 
+  select(matches("statistics|uploads")) %>% 
+  rename(uploads_id = items_content_details_related_playlists_uploads)
 
-# Upload Id
-up_id <- json_ch$items$contentDetails$relatedPlaylists$uploads
+channel_df
+names(channel_df)
+# Fetch data regarding videos ---------------------------------------------
 
-# Total number of videos
-tot_vids <- json_ch$items$statistics$videoCount
+videos_resp <- GET(
+  url,
+  path = "youtube/v3/playlistItems",
+  query = list(
+    forUsername = "MicheleBoldrin", 
+    playlistId = pull(channel_df, uploads_id),
+    part = "contentDetails", 
+    part = "snippet",
+    maxResults = 50, 
+    key = Sys.getenv("YT_API")
+    )
+  )
 
-# Total number of subscribers
-tot_subs <- json_ch$items$statistics$subscriberCount
 
-# Total channel views
-tot_view <- json_ch$items$statistics$viewCount
-
-info <- tibble(
-  Info = c("Ch.Name", "N.Videos", "N.Views", 
-           "N.Subs", "Upload Playlist Id"),
-  Data = c("Michele Boldrin", tot_vids, 
-           tot_view, tot_subs, ch_id)
-) 
-
-resource2 <- "/playlistItems"
-pars2 <- "contentDetails%2C%20snippet%2C%20id&maxResults=50"
-res_items <- GET(str_c(uri,
-                       resource2,
-                       "?part=", 
-                       pars2, 
-                       "&playlistId=", 
-                       up_id, 
-                       "&key=", 
-                       Sys.getenv("YT_API"))
-)
-
-http_status(res_items)
-prettify(res_items)
+status <- http_status(videos_resp)
+if (!str_detect(status[["message"]], "200")) {
+  stop("Bad request")
+}
 
 # Parse the content from JSON data
-items_parsed <- content(res_items, "text")
-playlists_items <- fromJSON(items_parsed)
+items_parsed <- content(videos_resp, "text")
+first_json <- fromJSON(items_parsed)
 
-# First next page token 
-next_token <- playlists_items$nextPageToken
+hierarchichal_to_df <- function(json_response) {
+  json_response %>% 
+    discard(is_empty) %>% 
+    map_if(is.data.frame, as.list) %>% 
+    as.data.frame() %>% 
+    as_tibble() %>% 
+    janitor::clean_names() %>% 
+    select(matches("token|published_at$|title$|description$|video_id")) %>%
+    mutate(across(contains("published_at"), ~ lubridate::ymd_hms(.x))) 
+}
 
-# Initialize data set: title, video Id, upload time
-details <- as_tibble(playlists_items$items$contentDetails)
-titles <- as_tibble(playlists_items$items$snippet$title)
+videos_df <- hierarchichal_to_df(first_json) 
+videos_df 
+uploads_id <- pull(channel_df, uploads_id)
+tot_videos <- pull(channel_df, items_statistics_video_count)
 
-df <- bind_cols(titles, details)
+floor(900/50) -1
+
+current_response <- GET(
+  url,
+  path = "youtube/v3/playlistItems",
+  query = list(
+    forUsername = "MicheleBoldrin",
+    playlistId = uploads_id,
+    pageToken ="EAAaB1BUOkNJUUg",
+    part = "snippet",
+    maxResults = 50,
+    key = Sys.getenv("YT_API")
+  )
+)
 
 # Grow df by recursive calls to the API resource
 while(TRUE) {
-  
-  if (nrow(df) < tot_vids) {
-    # Call the API
-    r_items <- GET(str_c(uri,
-                         resource2,
-                         "?part=", 
-                         pars2, 
-                         "&pageToken=", 
-                         tail(next_token, n = 1), 
-                         "&playlistId=", 
-                         up_id, 
-                         "&key=", 
-                         Sys.getenv("YT_API"))
+  if (nrow(videos_df) < tot_videos) {
+    current_response <- GET(
+      url,
+      path = "youtube/v3/playlistItems",
+      query = list(
+        forUsername = "MicheleBoldrin",
+        playlistId = uploads_id,
+        pageToken = unique(pull(videos_df, next_page_token)) %>% .[length(.)],
+        part = "snippet",
+        maxResults = 50,
+        key = Sys.getenv("YT_API")
+      )
     )
-    # Parsing
-    p_items <- content(r_items, "text")
-    play_items <- fromJSON(p_items)
-    
-    # Concatenate next 50 videos
-    det <- as_tibble(play_items$items$contentDetails)
-    tit <- as_tibble(play_items$items$snippet$title)
-    df <- bind_rows(df, bind_cols(tit, det))
-    
-    # Update next page token to get info on next 50 videos
-    next_token <- c(next_token, play_items$nextPageToken)
-    print(next_token)
+    current_parsed <- content(current_response, "text")
+    current_json <- fromJSON(current_parsed)
+    current_videos_df <- hierarchichal_to_df(current_json)
+    print(unique(pull(current_videos_df, next_page_token)))
+    videos_df <- bind_rows(videos_df, current_videos_df)
   } else {
     break
   }
 }
+
+videos_df
+saveRDS(videos_df, str_c(lubridate::today(), "videos_df.rds",sep = "-"))
 
 df <- df %>% 
   distinct(videoId, .keep_all = TRUE) %>% 
