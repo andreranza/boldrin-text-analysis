@@ -67,72 +67,57 @@ first_json <- fromJSON(items_parsed)
 
 hierarchichal_to_df <- function(json_response) {
   json_response %>% 
+    purrr::flatten() %>% 
     discard(is_empty) %>% 
     map_if(is.data.frame, as.list) %>% 
     as.data.frame() %>% 
     as_tibble() %>% 
     janitor::clean_names() %>% 
-    select(matches("token|published_at$|title$|description$|video_id")) %>%
-    mutate(across(contains("published_at"), ~ lubridate::ymd_hms(.x))) 
+    select(matches("token|published_at$|title$|description$|video_id|resource_id")) %>%
+    mutate(across(contains("published_at"), ~ lubridate::ymd_hms(.x)))
 }
-
 videos_df <- hierarchichal_to_df(first_json) 
-videos_df 
+glimpse(videos_df)
+
 uploads_id <- pull(channel_df, uploads_id)
-tot_videos <- pull(channel_df, items_statistics_video_count)
-
-floor(900/50) -1
-
-current_response <- GET(
-  url,
-  path = "youtube/v3/playlistItems",
-  query = list(
-    forUsername = "MicheleBoldrin",
-    playlistId = uploads_id,
-    pageToken ="EAAaB1BUOkNJUUg",
-    part = "snippet",
-    maxResults = 50,
-    key = Sys.getenv("YT_API")
-  )
-)
-
-# Grow df by recursive calls to the API resource
-while(TRUE) {
-  if (nrow(videos_df) < tot_videos) {
-    current_response <- GET(
-      url,
-      path = "youtube/v3/playlistItems",
-      query = list(
-        forUsername = "MicheleBoldrin",
-        playlistId = uploads_id,
-        pageToken = unique(pull(videos_df, next_page_token)) %>% .[length(.)],
-        part = "snippet",
-        maxResults = 50,
-        key = Sys.getenv("YT_API")
-      )
+flag_active_process <- TRUE
+while(flag_active_process) {
+  current_response <- GET(
+    url,
+    path = "youtube/v3/playlistItems",
+    query = list(
+      forUsername = "MicheleBoldrin",
+      playlistId = uploads_id,
+      pageToken = unique(pull(videos_df, next_page_token)) %>% .[length(.)],
+      part = "snippet",
+      maxResults = 50,
+      key = Sys.getenv("YT_API")
     )
-    current_parsed <- content(current_response, "text")
-    current_json <- fromJSON(current_parsed)
-    current_videos_df <- hierarchichal_to_df(current_json)
-    print(unique(pull(current_videos_df, next_page_token)))
-    videos_df <- bind_rows(videos_df, current_videos_df)
+  )
+  current_parsed <- content(current_response, "text")
+  current_json <- fromJSON(current_parsed)
+  current_videos_df <- hierarchichal_to_df(current_json)
+  videos_df <- bind_rows(videos_df, current_videos_df)
+  if (sum(str_detect(names(current_videos_df), "next_page_token")) != 0) {
+    current_token <- unique(pull(current_videos_df, next_page_token))
+    message("Fetched page with token: ", current_token)
   } else {
-    break
+    flag_active_process <- FALSE
+    message("Process completed!")
   }
 }
 
 videos_df
 saveRDS(videos_df, str_c(lubridate::today(), "videos_df.rds",sep = "-"))
 
-df <- df %>% 
-  distinct(videoId, .keep_all = TRUE) %>% 
-  rename(vidTitle = value)
+videos_df %>% names()
+  select(-matches("token"))
 
 resource3 <- "/videos"
 pars3 <- "snippet%2CcontentDetails%2Cstatistics"
 
 res_vid <- vector(mode = "list", length = nrow(df))
-for (i in seq_along(df$videoId)) {
+for (id in videos_df[["items_content_details_video_id"]]) {
   res_vid[[i]] <- GET(str_c(uri,
                             resource3, 
                             "?part=", 
