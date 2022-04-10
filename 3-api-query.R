@@ -110,24 +110,73 @@ while(flag_active_process) {
 videos_df
 saveRDS(videos_df, str_c(lubridate::today(), "videos_df.rds",sep = "-"))
 
-videos_df %>% names()
-  select(-matches("token"))
+videos_id <- pull(videos_df, snippet_resource_id_video_id)
+videos_response <- map(
+  videos_id,
+  function(x) {
+    GET(
+      url,
+      path = "youtube/v3/videos",
+      query = list(
+        id = x,
+        part = "snippet",
+        part = "contentDetails",
+        part = "statistics",
+        key = Sys.getenv("YT_API")
+      )
+    )
+  }
+)
 
-resource3 <- "/videos"
-pars3 <- "snippet%2CcontentDetails%2Cstatistics"
+all_videos_raw <- videos_response %>% 
+  map(~ content(.x, "text")) %>% 
+  map(~ fromJSON(.x)) %>% 
+  purrr::discard(is_empty) %>% 
+  map(~ map_if(.x, .p = ~ is.data.frame(.x), .f = ~ as.list(.x))) %>% 
+  map(as.data.frame) %>% 
+  map(as_tibble) %>% 
+  map_dfr(janitor::clean_names)
 
-res_vid <- vector(mode = "list", length = nrow(df))
-for (id in videos_df[["items_content_details_video_id"]]) {
-  res_vid[[i]] <- GET(str_c(uri,
-                            resource3, 
-                            "?part=", 
-                            pars3, 
-                            "&id=", 
-                            df$videoId[i], 
-                            "&key=", 
-                            Sys.getenv("YT_API"))
-  )
-}
+all_videos_raw <- all_videos_raw %>% 
+  select(
+    items_id,
+    items_snippet_published_at,
+    items_snippet_channel_id,
+    items_snippet_title,
+    items_snippet_description,
+    items_snippet_channel_title,
+    items_snippet_category_id,
+    items_snippet_live_broadcast_content,
+    items_snippet_default_language,
+    items_snippet_default_audio_language,
+    items_content_details_duration,
+    items_content_details_dimension,
+    items_content_details_definition,
+    items_content_details_caption,
+    items_content_details_licensed_content,
+    items_statistics_view_count,
+    items_statistics_favorite_count,
+    items_statistics_comment_count,
+    items_statistics_comment_count
+  ) 
+glimpse(all_videos_raw)
+
+all_videos_raw %>% 
+  mutate(items_snippet_published_at = lubridate::ymd_hms(items_snippet_published_at)) %>%
+  mutate(across(matches("title$|description$"), str_squish)) %>% 
+  mutate(across(contains("statistics"), as.numeric)) %>% 
+  mutate(
+    items_content_details_duration = str_remove(
+    items_content_details_duration, 
+    pattern = "^PT"
+    )
+  ) %>% glimpse()
+  mutate(
+    items_content_details_duration = lubridate::hms(
+      items_content_details_duration
+    )
+  ) %>% 
+  glimpse()
 
 videos <- map(res_vid, ~ content(.x, "text"))
 
