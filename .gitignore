@@ -5,7 +5,6 @@ data/*.txt
 *.Rproj
 transcripts
 *.Renviron
-sample-fragment.txt
 report
 *.pdf
 *.txt
