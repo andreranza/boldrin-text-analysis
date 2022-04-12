@@ -3,8 +3,9 @@
 data/boldrin-videos.csv
 *michele-boldrin.Rproj
 transcripts
-key.R
+.Renviron
 sample-fragment.txt
 data/df-topic-modeling.csv
 report
 *.pdf
+.Rproj.user
