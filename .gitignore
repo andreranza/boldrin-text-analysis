@@ -1,12 +1,10 @@
 *.Rhistory
 *.Rproj.user
-data/boldrin-videos.csv
-data/transcripts-words-df.csv
-*michele-boldrin.Rproj
+data/*.csv
+data/*.txt
+*.Rproj
 transcripts
-key.R
-sample-fragment.txt
-data/df-topic-modeling.csv
+*.Renviron
 report
 *.pdf
-*.rds
+*.txt
