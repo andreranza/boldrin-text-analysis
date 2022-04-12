@@ -159,7 +159,7 @@ all_videos_raw <- all_videos_raw %>%
     items_content_details_licensed_content,
     items_statistics_view_count,
     items_statistics_favorite_count,
-    items_statistics_comment_count,
+    items_statistics_like_count,
     items_statistics_comment_count
   )
 
