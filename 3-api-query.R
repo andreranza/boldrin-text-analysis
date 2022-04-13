@@ -35,6 +35,9 @@ channel_df <- json_resp %>%
   select(matches("statistics|uploads")) %>%
   rename(uploads_id = items_content_details_related_playlists_uploads)
 
+write_csv(all_videos_df, str_c("data/", lubridate::today(), "-channel_df.csv"))
+saveRDS(all_videos_df, str_c("data/", lubridate::today(), "-channel_df.rds"))
+
 # Fetch video Ids ---------------------------------------------------------
 
 videos_resp <- GET(
@@ -179,6 +182,7 @@ all_videos_df <- all_videos_raw %>%
 # Save data ---------------------------------------------------------------
 
 write_csv(all_videos_df, str_c("data/", lubridate::today(), "-videos_df.csv"))
+saveRDS(all_videos_df, str_c("data/", lubridate::today(), "-videos_df.rds"))
 
 # links.txt is useful since youtube-dl has an option -a that allows to specify
 # the path of a file containing the links.
