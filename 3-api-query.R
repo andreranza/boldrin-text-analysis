@@ -35,8 +35,8 @@ channel_df <- json_resp %>%
   select(matches("statistics|uploads")) %>%
   rename(uploads_id = items_content_details_related_playlists_uploads)
 
-write_csv(all_videos_df, str_c("data/", lubridate::today(), "-channel_df.csv"))
-saveRDS(all_videos_df, str_c("data/", lubridate::today(), "-channel_df.rds"))
+write_csv(channel_df, str_c("data/", lubridate::today(), "-channel_df.csv"))
+saveRDS(channel_df, str_c("data/", lubridate::today(), "-channel_df.rds"))
 
 # Fetch video Ids ---------------------------------------------------------
 
