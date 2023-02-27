@@ -1,4 +1,4 @@
-*Michele Boldrin* YouTube Channel: a general survey.
+*Michele Boldrin* YouTube Channel: text analysis.
 ================
 Andrea Ranzato
 14/09/20
